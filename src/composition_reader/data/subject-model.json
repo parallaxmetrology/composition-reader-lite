@@ -1,0 +1,13 @@
+{
+  "name": "U2NETP",
+  "file": "u2netp.onnx",
+  "bytes": 4574861,
+  "sha256": "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
+  "upstream_md5": "8e83ca70e441ab06c318d82300c84806",
+  "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
+  "architecture_source": "https://github.com/xuebinqin/U-2-Net",
+  "conversion_source": "https://github.com/danielgatis/rembg/blob/main/rembg/sessions/u2netp.py",
+  "reference_file_sha": "3a4536b8f58e11b065b54d225305ee7538030dc7",
+  "license_note": "Upstream architecture repository: Apache-2.0; rembg code: MIT. The separate converted model asset has no attached model-specific license. Downloaded for local use, not bundled in this package or claimed as MIT code.",
+  "training_note": "Pretrained salient-object model; not trained on composition labels here. Overlap between its original training images and PICD/CADB is not audited. The fresh holdout is unseen by this development process, not guaranteed unseen by all pretrained models."
+}

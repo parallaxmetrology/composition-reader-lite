@@ -1,0 +1,177 @@
+[
+  {
+    "path": "vendor/parallax_notan/__init__.py",
+    "source": "parallax-notan: parallax_notan/__init__.py",
+    "sha256": "071fea32909ee27cd58976429cac8cf7ece1dbf8bcd396d034c276fa2a7e3b91"
+  },
+  {
+    "path": "vendor/parallax_notan/cli.py",
+    "source": "parallax-notan: parallax_notan/cli.py",
+    "sha256": "cb0784cabc973d7618a8ef29ca469eb9e90d5a8248661c2bf3c2951d45f5bcf1"
+  },
+  {
+    "path": "vendor/parallax_notan/colour.py",
+    "source": "parallax-notan: parallax_notan/colour.py",
+    "sha256": "6658b403228c7450cc03804563385a3283bf745f90de6082164bdcb4367cf47f"
+  },
+  {
+    "path": "vendor/parallax_notan/construction.py",
+    "source": "parallax-notan: parallax_notan/construction.py",
+    "sha256": "85b81fd5a0ea3bdff9e18fe7a9a6489d4e75bc3205b34aa8f5bb4d0887ad4808"
+  },
+  {
+    "path": "vendor/parallax_notan/notan.py",
+    "source": "parallax-notan: parallax_notan/notan.py",
+    "sha256": "a67525c864e2c9671f8285993936c25b2200eb91e3e5618182b6269e5b221130"
+  },
+  {
+    "path": "vendor/parallax_notan/stimuli.py",
+    "source": "parallax-notan: parallax_notan/stimuli.py",
+    "sha256": "2eca767add68f1d012f8d481ff28062a6f6aa18685de12254d756bea425008ef"
+  },
+  {
+    "path": "vendor/vtl/__init__.py",
+    "source": "visual-thinking-lens: vtl/__init__.py",
+    "sha256": "294969a188349a65a61aeb85b303ba352c4af7ab85254790f2bad3e84d3e92d5"
+  },
+  {
+    "path": "vendor/vtl/_io.py",
+    "source": "visual-thinking-lens: vtl/_io.py",
+    "sha256": "5a3a30baff2a81b556b7e10f9525c74aa3bf34a653e58afc55b3129b52effce0"
+  },
+  {
+    "path": "vendor/vtl/batch.py",
+    "source": "visual-thinking-lens: vtl/batch.py",
+    "sha256": "bf9244d27e502e8a524ad137e4c36f89f610d660136f609fdea1cdd34240e663"
+  },
+  {
+    "path": "vendor/vtl/cli.py",
+    "source": "visual-thinking-lens: vtl/cli.py",
+    "sha256": "6adb3900c1b7fa4ef6b47a829ca361a3f22666994412613b55d787ba5e8cda3b"
+  },
+  {
+    "path": "vendor/vtl/color.py",
+    "source": "visual-thinking-lens: vtl/color.py",
+    "sha256": "bddc8209b582f91cc343eedd06bdbbc0fafc0fd556ea0bd11c9be18da52d57e7"
+  },
+  {
+    "path": "vendor/vtl/corpus.py",
+    "source": "visual-thinking-lens: vtl/corpus.py",
+    "sha256": "b942899c53ccbb4e6c78c95475ef01e61e40814cccc5299aaf70275d86f5d59a"
+  },
+  {
+    "path": "vendor/vtl/kernel.py",
+    "source": "visual-thinking-lens: vtl/kernel.py",
+    "sha256": "5c8514b53e0f4947a919bc28294ee920a2ffd76f94a8c67cb8f96ac51fbe6570"
+  },
+  {
+    "path": "vendor/vtl/qa.py",
+    "source": "visual-thinking-lens: vtl/qa.py",
+    "sha256": "eaa5ca72e267ee0c6cef86dd903c0c4984c74e085e4ac9092a76b26fe9d34229"
+  },
+  {
+    "path": "vendor/vtl/radial.py",
+    "source": "visual-thinking-lens: vtl/radial.py",
+    "sha256": "7e42a1b903124dc32d5f465010af19748c60f9a9a7703ee90b0206bddaa8025f"
+  },
+  {
+    "path": "vendor/vtl/viz.py",
+    "source": "visual-thinking-lens: vtl/viz.py",
+    "sha256": "de9dc2e0a13da9c3a91989ee58b00b3c1d6e0cad8babe3a49be43c3af35fd84d"
+  },
+  {
+    "path": "vendor/imgsym/__init__.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/__init__.py",
+    "sha256": "1377b024fdb2d3eaac3df72fbc4c6a69770f3ef0e23a23b49c3b379f6e5897d0"
+  },
+  {
+    "path": "vendor/imgsym/detection/__init__.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/detection/__init__.py",
+    "sha256": "fa9ae07c0032d5cd7dbef8ed817631c5a225518958a63d6543121cb1c9c670ea"
+  },
+  {
+    "path": "vendor/imgsym/detection/nxc.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/detection/nxc.py",
+    "sha256": "8162f00c88f67b11fc615dc5c3b4415fbe671a297d8e302723c9e6295ec94053"
+  },
+  {
+    "path": "vendor/imgsym/detection/r_lip.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/detection/r_lip.py",
+    "sha256": "57bffe7d60570322f733afbb11d064040f3b4c7c50109f4abc66bf0ec3d3834e"
+  },
+  {
+    "path": "vendor/imgsym/detection/wavelets.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/detection/wavelets.py",
+    "sha256": "cdf9fc686d41c5f4b1d01865193f809dcaa247e513922fcb61c960a30d1e21be"
+  },
+  {
+    "path": "vendor/imgsym/detection/xfeatures.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/detection/xfeatures.py",
+    "sha256": "c6ebf2971ba868a3ec430a5f6cc02248215dc5e12d8a964c3fcbfea11922908f"
+  },
+  {
+    "path": "vendor/imgsym/evaluation/__init__.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/evaluation/__init__.py",
+    "sha256": "4c3c28d53e00707e5c2643f69b92a2ddca230e3fe996f8a14cde721fa4fc34d7"
+  },
+  {
+    "path": "vendor/imgsym/evaluation/datasets.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/evaluation/datasets.py",
+    "sha256": "376dcee5c05d47f4849a8134f5debba3eb7ec334cbdc5d3fb9719a9fb0891ffe"
+  },
+  {
+    "path": "vendor/imgsym/evaluation/detection_metrics.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/evaluation/detection_metrics.py",
+    "sha256": "e4551e21d2387e18ea8d94fba4049fd4d28da2d0a5ac86d7996b6858385eeba6"
+  },
+  {
+    "path": "vendor/imgsym/evaluation/extraction.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/evaluation/extraction.py",
+    "sha256": "cf850518ceaaa20d54bced1f87bffdb370c0b9d2c44684753cd095ecbc6bc46f"
+  },
+  {
+    "path": "vendor/imgsym/evaluation/scoring_metrics.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/evaluation/scoring_metrics.py",
+    "sha256": "4a317fbae86c736949d0fb5a2b72feb7b3dde71f195f93dc48d4f3b04b2f8790"
+  },
+  {
+    "path": "vendor/imgsym/matching/__init__.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/matching/__init__.py",
+    "sha256": "31d6cd7f5a6fbd490b815496e196528c2a79e71207f2179988716fbfa57ae9a5"
+  },
+  {
+    "path": "vendor/imgsym/matching/descriptors.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/matching/descriptors.py",
+    "sha256": "c273bfb8af66390cb89e9d42de1b294893a082856be7d9997a4fd20ea5d97b2d"
+  },
+  {
+    "path": "vendor/imgsym/scoring/__init__.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/scoring/__init__.py",
+    "sha256": "c49e9353877622d436b396d519539d977f72bd3dcd9ebbe7bebb4da5b43f124a"
+  },
+  {
+    "path": "vendor/imgsym/scoring/calculators.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/scoring/calculators.py",
+    "sha256": "8e02c30262f80d0b0f79e7ba4a50839b7c6d503c735b16d89b33dd2d0e6701c0"
+  },
+  {
+    "path": "vendor/imgsym/utils/__init__.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/utils/__init__.py",
+    "sha256": "169525171b0ac9e4e6217ff388adbac9905f668393939465b1d3d627a86567fe"
+  },
+  {
+    "path": "vendor/imgsym/utils/image.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/utils/image.py",
+    "sha256": "41aee2936f15cdbc5800a9d23e6981a9e3e167bc47027e8fa0b4121a9483f406"
+  },
+  {
+    "path": "vendor/imgsym/utils/patch.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/utils/patch.py",
+    "sha256": "8692c3b94820d1dc44d095d8ebb574550e342123fba2e46ee36c8558a15a6780"
+  },
+  {
+    "path": "vendor/imgsym/utils/visualization.py",
+    "source": "https://github.com/maxwoe/imgsym/blob/c8b1cd8e7d0ce998044caf8804c1691ad6546cb9/imgsym/utils/visualization.py",
+    "sha256": "d0bb8ae2d4f7c951bad2f13b21017cbb4f5e35c0ccd73e9f99e18cbb8e7fe18e"
+  }
+]

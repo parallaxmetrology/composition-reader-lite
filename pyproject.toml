@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "composition-reader"
+version = "0.8.0"
+description = "An evidence-based composition workbench built on VTL and Notan"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "scipy>=1.11", "scikit-image>=0.23", "Pillow>=10", "opencv-python>=4.9,<5", "matplotlib>=3.8", "pandas>=2.1", "fastapi>=0.110", "uvicorn>=0.29", "onnxruntime>=1.23"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+validation = ["requests>=2.31", "beautifulsoup4>=4.12"]
+
+[project.scripts]
+composition-reader = "composition_reader.cli:main"
+
+[tool.setuptools]
+license-files = ["LICENSE", "vendor/*LICENSE"]
+
+[tool.setuptools.packages.find]
+where = ["src", "vendor"]
+include = ["composition_reader*", "vtl*", "parallax_notan*", "imgsym*"]
+
+[tool.setuptools.package-data]
+composition_reader = ["web/*", "data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "vendor"]
