@@ -33,9 +33,35 @@ def regions_from_mask(field,excluded=()):
     for r in candidates:r['placement_weight']=r['selection_weight']/total if r['included'] and total else 0
     return candidates
 
+def _mask(contour,shape):
+    from skimage.draw import polygon as fill_polygon
+    if not contour or len(contour)<3:return None
+    h,w=shape;c=np.asarray(contour,float);rr,cc=fill_polygon(c[:,1]*(h-1),c[:,0]*(w-1),shape)
+    m=np.zeros(shape,bool);m[rr,cc]=True
+    return m if m.any() else None
+
+
+def sky_like(region,lum):
+    """A foreground component that is really sky (or a bright ceiling): it hangs from the top
+    edge and a side (or spans half the width), does not reach the bottom, sits in the upper 40% and is brighter than the
+    picture's median. Head-cropped portraits reach the bottom edge and are not affected."""
+    x0,y0,x1,y1=region['bbox'];t=.02
+    if not (y0<=t and (x0<=t or x1>=1-t or x1-x0>=.5) and y1<1-t and region['center'][1]<.4):return False
+    m=_mask(region.get('contour'),lum.shape)
+    return m is not None and float(lum[m].mean())>float(np.median(lum))
+
+
 def select_subjects(rgb,excluded=()):
     field=foreground(rgb);regions=regions_from_mask(field,excluded)
-    return field,regions,{'method':'foreground-components/1','model':SPEC['name'],'model_sha256':SPEC['sha256'],
+    # Set aside sky-like components before anything uses them; recorded, never silent.
+    lum=rgb@np.array([.2126,.7152,.0722]);set_aside=[]
+    for r in regions:
+        if r['included'] and sky_like(r,lum):
+            r['included']=False;r['excluded_reason']='sky-like: hangs from the top edge across a side or half the width, upper 40%, brighter than the median';set_aside.append(r['id'])
+    if set_aside:
+        total=sum(r['selection_weight'] for r in regions if r['included'])
+        for r in regions:r['placement_weight']=r['selection_weight']/total if r['included'] and total else 0
+    return field,regions,{'method':'foreground-components/1','model':SPEC['name'],'model_sha256':SPEC['sha256'],'sky_like_set_aside':set_aside,
         'provider':'CPUExecutionProvider','network_size':[320,320],'threshold':.5,
         'importance':'sqrt(foreground area) × mean raw foreground strength squared, normalized across included components',
         'guide_independent':True,'category_probability':False,'foreground_fraction':float((field>=.5).mean()),

@@ -56,6 +56,42 @@ def frame_context(aspect):
             for id,name,v in ratios]
 
 
+def held_back_reason(h):
+    """Plain statement of why a fitting hypothesis was not reported as a reading."""
+    c=h.get('control') or {};st=h.get('stability') or {};p=h.get('parameters') or {}
+    if h['status']=='sensitive':
+        parts=[]
+        if st.get('max_fit_change',0)>.15:parts.append(f'its fit changes by up to {st["max_fit_change"]:.2f}')
+        if st.get('max_contact_weight_change',0)>.1:parts.append(f'the share of subject weight pinned by the frame changes by up to {st["max_contact_weight_change"]:.2f}')
+        if not parts:parts.append('the selected evidence does not persist')
+        return 'Held back: under slight blur or resampling '+' and '.join(parts)+', so the reading depends on extraction details.'
+    reasons=[]
+    if c and h['fit']<.5:
+        reasons.append(f'its fit of {int(h["fit"]*1000)/1000:.3f} is under the 0.500 a reading needs')
+    if c.get('two_axis_informative') is False:
+        reasons.append('the subject fills or touches the frame, so its position is constrained and the control cannot test it')
+    tail=c.get(c.get('decision_tail_key','family_max_tail_fraction'))
+    if tail is not None and tail>.1:
+        reasons.append(f'randomized controls match or beat it {tail:.0%} of the time (a reading needs 10% or less)')
+    if c.get('minimum_excess_fit') is not None and c.get('excess_fit',1)<c['minimum_excess_fit']:
+        reasons.append(f'it is only {c["excess_fit"]:+.2f} above the control average (needs +{c["minimum_excess_fit"]:.2f})')
+    guards={'whole_subject_corroboration':'the whole subject does not corroborate the face alignment',
+            'whole_foreground_corroboration':'the whole foreground does not corroborate the object alignment',
+            'object_identity_guard':'the detected object is not confident enough to anchor the reading',
+            'main_subject_guard':'the restored main subject does not pass the stricter coincidence guard'}
+    reasons+=[text for key,text in guards.items() if isinstance(p.get(key),dict) and p[key].get('passed') is False]
+    if not reasons:reasons.append('it does not meet this detector’s decision rule')
+    return 'Held back: '+'; '.join(reasons)+'.'
+
+
+def near_misses(hypotheses,reported,limit=3):
+    """The strongest fits that were not reported, each with the rule that held it back."""
+    pool=[h for h in hypotheses if h['status'] in ('ambiguous','sensitive') and h['eligible']
+          and h['family'] not in ('diagnostic','relations') and h['id'] not in reported and h['fit']>=.45]
+    return [{'hypothesis_id':h['id'],'name':h['name'],'fit':h['fit'],'status':h['status'],'reason':held_back_reason(h)}
+            for h in sorted(pool,key=lambda h:-h['fit'])[:limit]]
+
+
 def apply_stability(rgb,source,hypotheses,border='raw',excluded=None,anchors=None):
     variants={};subject_variants={}
     # Re-extract after blur and down/up sampling; manual anchors stay user-declared.
@@ -142,6 +178,7 @@ def analyze(data: bytes, *, name='image', border='raw', null_samples=64, stabili
     visible=[r for r in hypotheses if r['status'] in ['supported','descriptive'] and r['family'] not in ['diagnostic','relations']]
     report['reading']=[{'hypothesis_id':r['id'],'text':r['explanation']} for r in sorted(visible,key=lambda r:(r['status']!='supported',-r['fit']))[:5]]
     if not report['reading']:report['reading']=[{'hypothesis_id':None,'text':'No clear supported arrangement under the current extraction. Inspect the regions or add your own anchors.'}]
+    report['near_misses']=near_misses(hypotheses,{r['hypothesis_id'] for r in report['reading']})
     field_images={
         'image':png(rgb),'mass':png(scene.mass/max(float(scene.mass.max()),1e-9)),
         'notan':png(value_map(rgb,mass=scene.mass)),

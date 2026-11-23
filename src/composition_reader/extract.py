@@ -68,7 +68,7 @@ def _regions(mass, lum):
     regions.sort(key=lambda x:-x['mass_share'])
     return labels,regions[:20],max(0,len(regions)-20)
 
-def _lines(rgb, chroma):
+def _lines(rgb, chroma, min_length=.065, limit=64):
     h,w=rgb.shape[:2];diag=np.hypot(w,h);result=[]
     lum=rgb@np.array([.2126,.7152,.0722])
     detector=cv2.createLineSegmentDetector(cv2.LSD_REFINE_STD)
@@ -81,13 +81,13 @@ def _lines(rgb, chroma):
         if found is None:continue
         for v in found[:,0]:
             a,b=v[:2],v[2:];length=float(np.linalg.norm(b-a)/diag)
-            if length<.065:continue
+            if length<min_length:continue
             angle=float(np.arctan2(b[1]-a[1],b[0]-a[0])%np.pi)
             c=(a+b)/2/np.array([w-1,h-1])
             if any(np.linalg.norm(c-np.mean(o['points'],axis=0))<.025 and abs((angle-o['angle']+np.pi/2)%np.pi-np.pi/2)<.06 for o in result):continue
             result.append({'id':f'l{len(result)+1}','points':(np.array([a,b])/[w-1,h-1]).tolist(),
                            'length':length,'angle':angle,'channel':name})
-    return sorted(result,key=lambda r:-r['length'])[:64]
+    return sorted(result,key=lambda r:-r['length'])[:limit]
 
 def extract(rgb, source=None, border='raw', excluded=None, anchors=None):
     h,w=rgb.shape[:2];lum=rgb@np.array([.2126,.7152,.0722]);chroma=oklab_chroma(rgb)
@@ -99,6 +99,17 @@ def extract(rgb, source=None, border='raw', excluded=None, anchors=None):
         weight=.5+.5*np.clip((d-.02)/.05,0,1);mass=mass*weight;absolute=absolute*weight
     labels,regions,dropped=_regions(mass,lum) if not blank else (np.zeros((h,w),np.int32),[],0)
     detected=regions
+    border_regions=[]
+    if border=='protected' and regions:
+        # A mat or frame survives the halved weighting as a ring-shaped mass whose
+        # centroid falls in the empty middle of the frame. Drop tonal masses that lie
+        # mostly inside the protected band (outer 7%); interior bodies that merely touch it stay.
+        band=d<.07
+        for r in regions:
+            sel=labels==int(r['id'][1:])
+            r['border_band_fraction']=float(band[sel].mean()) if sel.any() else 0.
+        border_regions=[r['id'] for r in regions if r['border_band_fraction']>.6]
+        regions=[r for r in regions if r['id'] not in border_regions]
     excluded=set(excluded or [])
     regions=[r for r in regions if r['id'] not in excluded]
     subject_map=np.zeros((h,w),dtype=float);subjects=[];subject_metadata={'method':'insufficient-contrast'}
@@ -129,11 +140,13 @@ def extract(rgb, source=None, border='raw', excluded=None, anchors=None):
     if blank:warning.append('Insufficient absolute contrast for a structural reading; normalized noise is not treated as composition.')
     if coverage<.5 and not blank:warning.append('Detected regions account for less than half of the mass field. Placement hypotheses may miss diffuse structure.')
     if dropped:warning.append(f'{dropped} smaller regions exceed the 20-region reporting limit.')
+    if subject_metadata.get('sky_like_set_aside'):warning.append(f'Foreground component(s) {", ".join(subject_metadata["sky_like_set_aside"])} look like sky (hanging from the top edge, bright, upper part of the frame) and are not used as subjects.')
+    if border_regions:warning.append(f'Border protection set aside {len(border_regions)} tonal mass(es) lying mostly in the outer 7% band ({", ".join(border_regions)}); they read as frame or mat, not composition.')
     if anchors is not None:warning.append('Placement hypotheses use your corrected anchors. Field measurements still describe the complete image.')
     elif not blank and not any(r['included'] for r in subjects):warning.append('No distinct included foreground subject supports placement. Inspect the subject map or mark anchors; tonal masses are not silently substituted.')
     summary={'mass_center':center,'flat_fraction':float((mass<.06).mean()),'absolute_signal':energy,
              'region_coverage':min(1,coverage),'region_count':len(regions),'line_count':len(lines),
-             'blank':blank,'border':border,'anchor_mode':'user' if anchors is not None else 'automatic',
+             'blank':blank,'border':border,'border_regions_set_aside':border_regions,'anchor_mode':'user' if anchors is not None else 'automatic',
              'detected_regions':detected,'subject_count':sum(r['included'] for r in subjects),
              'placement_mode':'user' if anchors is not None else 'foreground'}
     return Scene(rgb,mass,absolute,lum,chroma,edges,labels,regions,lines,summary,warning,source or {},subjects,subject_map,subject_metadata)

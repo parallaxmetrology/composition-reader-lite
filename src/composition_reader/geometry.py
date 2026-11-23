@@ -42,6 +42,8 @@ def templates(aspect):
         'rule-of-fifths':grid([.2,.4,.6,.8]),'centre-cross':grid([.5]),
         'quadrant':grid([.5]),'baroque-diagonal':[diag[0]],'sinister-diagonal':[diag[1]],
         'diagonal-method':d,'golden-triangle':[diag[0],*recip[:2]],
+        # Mirror form on the other diagonal; the detector reports the better of the two.
+        'golden-triangle-ascending':[diag[1],*recip[2:]],
         'rabatment':rabatt,'reciprocal-lines':[*diag,*recip],
         'armature-14':[*diag,*mids,*diamond],
     }
