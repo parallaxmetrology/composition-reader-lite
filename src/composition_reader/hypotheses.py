@@ -14,6 +14,18 @@ from .model import Scene
 
 from .registry import NAMES, DETECTORS
 
+# Bilateral symmetry: an axis earns full credit when at least 90% of the frame mirrors
+# inside the frame (an axis within 5% of the centre line), none at 50% or less.
+FRAME_COVERAGE_ZERO, FRAME_COVERAGE_FULL = .5, .9
+# Radial organization: structure must reach this far from its centre (image diagonals,
+# gradient-weighted mean radius) for full credit; a small isolated blob earns little.
+RADIAL_EXTENT_FULL = .15
+# ...and must surround the centre: full credit when 9 of 12 direction sectors hold structure.
+RADIAL_SECTORS, RADIAL_SURROUND_FULL = 12, .75
+# Counterweight: the lead mass must sit at least this far off centre (image diagonals)
+# for full credit; a centred mass has nothing to counterweight.
+COUNTERWEIGHT_LEVER_FULL = .15
+
 
 def result(id,family,fit,geometry=None,evidence=None,explanation='',limits=None,eligible=True,parameters=None):
     spec=DETECTORS[id]
@@ -105,11 +117,17 @@ def symmetry_read(s):
     h,w=s.mass.shape;small=cv2.resize(s.mass,(max(32,round(w*128/max(h,w))),max(32,round(h*128/max(h,w)))))
     shape=(max(32,round(w*192/max(h,w))),max(32,round(h*192/max(h,w))))
     tone=cv2.resize(s.tone,shape,interpolation=cv2.INTER_AREA)
+    sh,sw=tone.shape;yy,xx=np.mgrid[:sh,:sw]
+    # Protected border mode uses the same ramp as the mass field, so a mat or frame
+    # does not supply most of the mirrored structure.
+    edge_weight=1.
+    if s.summary.get('border')=='protected':
+        d=np.minimum.reduce([xx/(sw-1),(sw-1-xx)/(sw-1),yy/(sh-1),(sh-1-yy)/(sh-1)])
+        edge_weight=np.clip((d-.02)/.05,0,1)
     gradients=[]
     for sigma in [1.2,3.0]:
         gy,gx=np.gradient(gaussian_filter(tone,sigma))
-        gradients.append((gx,gy))
-    sh,sw=tone.shape;yy,xx=np.mgrid[:sh,:sw]
+        gradients.append((gx*edge_weight,gy*edge_weight))
     centers=[[.5,.5],s.summary['mass_center']]
     def axis_score(c,a):
         cx,cy=np.array(c)*[sw-1,sh-1];dx,dy=xx-cx,yy-cy
@@ -128,22 +146,36 @@ def symmetry_read(s):
             correlation=float(-2*np.sum(normal*reflected)/max(denominator,1e-12))
             scores.append(max(0,correlation)*min(1,fraction/.15) if energy>1e-5 else 0)
             fractions.append(fraction)
-        return (float(np.mean(scores)),list(c),a,scores,fractions)
+        # Frame coverage: share of the frame whose mirror image stays inside it. An axis
+        # through an off-centre object can mirror that object perfectly while most of the
+        # frame has no partner; that is subject symmetry, not a symmetric composition.
+        coverage=float(1-outside.mean())
+        agreement=float(np.mean(scores))
+        return (agreement*frame_gate(coverage),list(c),a,scores,fractions,agreement,coverage)
+    def frame_gate(coverage):return float(np.clip((coverage-FRAME_COVERAGE_ZERO)/(FRAME_COVERAGE_FULL-FRAME_COVERAGE_ZERO),0,1))
     candidates=[axis_score(c,a) for c in centers for a in np.linspace(0,np.pi,18,endpoint=False)]
     # Refine a bounded neighborhood of three coarse axes. Exact frame/mass
     # centers need not coincide with a real photographic symmetry axis.
-    for _,c,a,_,_ in sorted(candidates,key=lambda x:-x[0])[:3]:
+    # Seeds come from both rankings so the ungated subject reading is also refined.
+    seeds=sorted(candidates,key=lambda x:-x[0])[:3]+sorted(candidates,key=lambda x:-x[5])[:3]
+    for _,c,a,*_ in seeds:
         for offset in np.linspace(-.06,.06,9):
             shifted=np.array(c)+offset*np.array([-np.sin(a),np.cos(a)])/s.metric_scale
             for angle_delta in [-np.pi/72,0,np.pi/72]:
                 candidates.append(axis_score(shifted,a+angle_delta))
-    fit,c,a,scores,fractions=max(candidates,key=lambda x:x[0]);v=np.array([np.cos(a),np.sin(a)])/s.metric_scale*.7
+    fit,c,a,scores,fractions,agreement,coverage=max(candidates,key=lambda x:x[0]);v=np.array([np.cos(a),np.sin(a)])/s.metric_scale*.7
+    subject=max(candidates,key=lambda x:x[5])
     geom=[line(np.array(c)-v,np.array(c)+v)]
     tonal_overlap=_reflect_score(small,c,a)
     extra={'tonal_mass_overlap':tonal_overlap,'scales_pixels':[1.2,3.0],
            'structural_agreement_by_scale':scores,'normal_gradient_energy_fraction':fractions,
-           'axis_candidates':len(candidates),'decision_threshold':.45,'decision_basis':'structural agreement; not tonal mass overlap',
-           'threshold_selection':'Previous CADB development cohort only; coarsely swept thresholds, chosen for under 5% development false-positive rate.'}
+           'structural_agreement':agreement,'axis_frame_coverage':coverage,
+           'frame_coverage_gate':{'zero_at':FRAME_COVERAGE_ZERO,'full_at':FRAME_COVERAGE_FULL,
+               'meaning':'Fit = structural agreement x linear gate on the share of the frame whose mirror image stays inside the frame. Fixed before testing; not tuned on labels.'},
+           'subject_symmetry':{'structural_agreement':subject[5],'axis_frame_coverage':subject[6],'center':subject[1],'angle_radians':subject[2],
+               'meaning':'Best mirror axis with no frame-coverage requirement: a symmetric object anywhere in the frame. Diagnostic only.'},
+           'axis_candidates':len(candidates),'decision_threshold':.45,'decision_basis':'structural agreement x frame coverage; not tonal mass overlap',
+           'threshold_selection':'Previous CADB development cohort only; coarsely swept thresholds, chosen for under 5% development false-positive rate. Chosen before the frame-coverage gate, which can only lower fits.'}
     try:
         import imgsym
         bgr=np.uint8(np.clip(s.rgb[...,::-1]*255,0,255))
@@ -152,13 +184,18 @@ def symmetry_read(s):
         extra['imgsym_role']='texture symmetry along selected structural axis; supplementary, not fused'
     except (ValueError,RuntimeError,ImportError,cv2.error) as e:
         extra['imgsym_unavailable']=str(e)[:160]
+    text=f'{agreement:.0%} matching structural evidence across this axis; {coverage:.0%} of the frame has a mirror partner inside the frame. Frame-symmetry fit {fit:.0%}.'
+    if subject[5]>=.45 and subject[5]-agreement>.1 and subject[6]<FRAME_COVERAGE_FULL:
+        text+=f' A separate axis mirrors one part of the picture at {subject[5]:.0%} agreement but covers only {subject[6]:.0%} of the frame: symmetric subject, not symmetric composition.'
     return result('bilateral-symmetry','symmetry',fit,geom,
-                  [{'measure':'paired structural gradient agreement','value':fit,'unit':'support'},
+                  [{'measure':'paired structural gradient agreement','value':agreement,'unit':'support'},
+                   {'measure':'frame share with a mirror partner','value':coverage,'unit':'fraction'},
                    {'measure':'tonal mass overlap (diagnostic only)','value':tonal_overlap,'unit':'fraction'}],
-                  f'{fit:.0%} matching structural evidence across this axis; tonal overlap alone is not counted as symmetry.',
+                  text,
                   ['Requires opposite gradients normal to a reflected axis at two scales; similar broad light/dark bands are insufficient.',
-                   'A symmetric subject can dominate. This does not establish semantic symmetry or artistic intent.',
-                   'Bounded axis search: 36 coarse axes plus 81 local refinements; fit is not a category probability.'],
+                   'The axis must split the frame: full credit when at least 90% of the frame has a mirror partner, none at 50% or less. A symmetric object off to one side is reported separately as subject symmetry.',
+                   'A symmetric subject can still dominate a central axis. This does not establish semantic symmetry or artistic intent.',
+                   'Bounded axis search: 36 coarse axes plus local refinements of the best seeds; fit is not a category probability.'],
                   parameters={'center':c,'angle_radians':a,**extra})
 
 
@@ -252,6 +289,8 @@ def spiral_read(s, null_samples=0, seed=173):
             'family_max_tail_fraction':tail,
             'interpretation':'Frame-alignment control preserving texture; not a category probability.'}
         out['status']='supported' if fit>=.5 and tail<=.1 else ('ambiguous' if fit>=.45 else 'weak')
+        if tail>.5 and fit>=.45:
+            out['explanation']+=f' Shifted copies of the same edge field fit as well in {tail:.0%} of trials: this support comes from edge density, not from where the spiral sits.'
     return out
 
 
@@ -285,19 +324,51 @@ def convergence_read(s):
                   parameters={'vanishing_point':pn.tolist(),'direction_diversity':spread})
 
 
+def _lever(pts,weights,ids,scale):
+    """Lead = greatest moment about the frame centre; counter = the single opposing mass
+    that cancels the largest share of it."""
+    center=np.average(pts,axis=0,weights=weights);base=float(np.linalg.norm((center-.5)*scale))
+    arm=(pts-.5)*scale;moment=weights[:,None]*arm;size=np.linalg.norm(moment,axis=1)
+    lead=int(np.argmax(size));lever=float(np.linalg.norm(arm[lead]))
+    if size[lead]>1e-9:
+        u=moment[lead]/size[lead];against=-(moment@u)/size[lead];against[lead]=0
+    else:against=np.zeros(len(pts))
+    counter=int(np.argmax(against));share=float(np.clip(against[counter],0,1))
+    offset=min(1.,lever/COUNTERWEIGHT_LEVER_FULL)
+    # Asymmetry: 0 for a mirror twin (equal weight at equal distance), near 1 when a small
+    # mass far out balances a large one near the centre.
+    d=np.linalg.norm(arm,axis=1);wl,wc,dl,dc=weights[lead],weights[counter],d[lead],d[counter]
+    asym=float(1-(min(wl,wc)/max(wl,wc,1e-12))*(min(dl,dc)/max(dl,dc,1e-12))) if share>0 else 0.
+    return {'fit':share*offset*asym,'lead':lead,'counter':counter,'share':share,'lever':lever,'offset':offset,'asymmetry':asym,'base':base,'center':center,
+            'against':against,'arm':arm,'lead_id':ids[lead],'counter_id':ids[counter] if share>0 else None}
+
+
 def relational_reads(s):
-    pts=s.points;weights=s.weights;scale=s.metric_scale;out=[]
-    if len(pts)>1:
-        center=np.average(pts,axis=0,weights=weights);base=float(np.linalg.norm((center-.5)*scale));ev=[]
-        for i,(r,p,w) in enumerate(zip(s.regions,pts,weights)):
-            if w>=.999:continue
-            after=(center-w*p)/(1-w);delta=float(np.linalg.norm((after-.5)*scale)-base)
-            ev.append({'element_id':r['id'],'measure':'imbalance increase if anchor omitted','value':delta,'unit':'image diagonal'})
-        best=max(ev,key=lambda x:x['value']) if ev else None
-        fit=min(1,max(0,best['value']/.10)) if best else 0
-        out.append(result('counterbalanced','relations',fit,[point(center),line((.5,.5),center)],ev,
-            f'{best["element_id"]} changes anchor-system imbalance by {best["value"]:+.3f} image diagonals when omitted.' if best else '',
-            ['This is omission from the measured anchor system, not an inpainted removal from the image.'],parameters={'anchor_imbalance':base}))
+    scale=s.metric_scale;out=[]
+    if len(s.points)>1:
+        # Lever reading on tonal masses: the mass with the greatest moment about the frame
+        # centre is the load; a counterweight is one opposing mass that cancels it. Balance
+        # from many masses spread evenly is not one counterweight; equal twins are symmetry.
+        items=[{'id':r['id'],'kind':'tonal mass'} for r in s.regions];pts,weights=s.points,s.weights
+        L=_lever(pts,weights,[x['id'] for x in items],scale)
+        lead,counter,share,lever,offset,base=L['lead'],L['counter'],L['share'],L['lever'],L['offset'],L['base']
+        fit=L['fit'];against=L['against'];arm=L['arm']
+        ev=[{'element_id':x['id'],'measure':'share of the lead mass\u2019s leverage it cancels (negative: same side, adds to it)' if i!=lead else 'lead offset from frame centre',
+             'value':float(against[i]) if i!=lead else lever,'unit':'fraction of lead moment' if i!=lead else 'image diagonal'}
+            for i,x in enumerate(items)]
+        ev.sort(key=lambda e:(e['element_id']!=items[lead]['id'],-e['value']))
+        Li,Ci=items[lead],items[counter]
+        text=(f'{Li["id"]} ({weights[lead]:.0%} of mass, {lever:.2f} diagonals off centre) is the heaviest lever; '
+              f'{Ci["id"]} ({weights[counter]:.0%}, {np.linalg.norm(arm[counter]):.2f} off centre) cancels {share:.0%} of it from the opposite side. '
+              f'The system sits {base:.2f} diagonals from centre.') if share>0 else f'No mass opposes {Li["id"]}, the heaviest lever; the system sits {base:.2f} diagonals from centre.'
+        if offset<1:text+=f' The lead is only {lever:.2f} diagonals off centre, so there is little to counterweight (full credit at {COUNTERWEIGHT_LEVER_FULL:.2f}).'
+        if share>0 and L['asymmetry']<.5:text+=f' The two are close to mirror twins (asymmetry {L["asymmetry"]:.2f}): that is symmetric balance, read under bilateral symmetry, not a counterweight.'
+        geom=[line(pts[lead],(.5,.5)),point(pts[lead]),point(L['center'])]+([line((.5,.5),pts[counter]),point(pts[counter])] if share>0 else [])
+        out.append(result('counterbalanced','relations',fit,geom,ev,text,
+            ['Weights are tonal-mass shares; distance from the frame centre is the lever arm. Perceptual weight also depends on colour, isolation and subject interest, which this does not model.',
+             'Fit = share of the lead mass\u2019s moment cancelled by one opposing mass x lead offset gate x asymmetry. Several small masses spread evenly do not count as one counterweight, and equal twins at equal distances are symmetry, not counterweight.'],
+            parameters={'anchor_imbalance':base,'lead_mass':Li['id'],'lead_offset_diagonal':lever,'counter_mass':Ci['id'] if share>0 else None,
+                        'cancelled_share':share,'asymmetry':L['asymmetry'],'lever_full_at':COUNTERWEIGHT_LEVER_FULL}))
     else:out.append(result('counterbalanced','relations',0,eligible=False,explanation='Counterweight analysis needs at least two anchors.'))
     flat=s.summary['flat_fraction']
     out.append(result('negative-space','relations',flat,explanation=f'{flat:.0%} of the Notan field lies below its flat-field threshold.',
@@ -309,11 +380,28 @@ def relational_reads(s):
         h,w=s.mass.shape;yy,xx=np.mgrid[:h,:w];c=s.summary['mass_center'];dx=xx-c[0]*(w-1);dy=yy-c[1]*(h-1)
         radial=(gx*dx+gy*dy)**2/(np.maximum(mag**2*(dx**2+dy**2),1e-12))
         alignment=float(np.sum(radial*mag)/max(mag.sum(),1e-12))
-        fit=max(0,2*alignment-1)
+        # Gradients along the rays mean rings or a round body (concentric); gradients across
+        # the rays mean spokes running out from the centre (radiating). Both are radial
+        # organization, so the fit is the departure from the isotropic 0.5 in either direction.
+        polarity=2*alignment-1;kind='no radial preference' if abs(polarity)<.05 else ('concentric' if polarity>0 else 'radiating')
+        dist=np.hypot(dx/np.hypot(w-1,h-1),dy/np.hypot(w-1,h-1))
+        extent=float(np.sum(dist*mag)/max(mag.sum(),1e-12));reach=min(1.,extent/RADIAL_EXTENT_FULL)
+        # Structure must surround the centre: a single line through it is one ray, not a
+        # radial system. Count 12 direction sectors holding at least half a uniform share.
+        theta=np.arctan2(dy,dx);sector=np.floor((theta+np.pi)/(2*np.pi)*RADIAL_SECTORS).astype(int)%RADIAL_SECTORS
+        shares=np.bincount(sector.ravel(),weights=mag.ravel(),minlength=RADIAL_SECTORS)/max(mag.sum(),1e-12)
+        surround=float(np.mean(shares>=.5/RADIAL_SECTORS));wrap=min(1.,surround/RADIAL_SURROUND_FULL)
+        fit=abs(polarity)*reach*wrap
         out.append(result('radial-organization','symmetry',fit,[point(c)],
-            [{'measure':'radial gradient agreement','value':alignment,'unit':'mean squared cosine'}],
-            f'Gradient alignment around the mass center is {alignment:.2f} (isotropic direction reference: 0.50).',
-            ['A round isolated body can produce radial agreement; this does not establish a radial composition of multiple objects.']))
+            [{'measure':'radial gradient agreement','value':alignment,'unit':'mean squared cosine'},
+             {'measure':'gradient-weighted reach from centre','value':extent,'unit':'image diagonal'},
+             {'measure':'direction sectors around the centre holding structure','value':surround,'unit':'fraction of 12'}],
+            f'Gradient alignment around the mass center is {alignment:.2f} (isotropic reference 0.50): {kind if kind.startswith("no ") else kind+" structure"}. It reaches a mean {extent:.2f} image diagonals from the centre and occupies {surround:.0%} of the directions around it; fit {fit:.0%}.',
+            ['Concentric (rings, round bodies) and radiating (spokes, rays) structure both count; the parameters say which.',
+             f'Full credit needs structure reaching {RADIAL_EXTENT_FULL:.2f} diagonals from the centre on average, in at least {RADIAL_SURROUND_FULL:.0%} of 12 direction sectors. One small blob or one line through the centre reads weak. A large round body can still read as concentric.',
+             'Convergent perspective lines around the mass centre also read as radiating.'],
+            parameters={'kind':kind,'polarity':polarity,'reach_diagonal':extent,'reach_full_at':RADIAL_EXTENT_FULL,
+                        'surround_fraction':surround,'surround_full_at':RADIAL_SURROUND_FULL,'sectors':RADIAL_SECTORS,'centre':c}))
     else:out.append(result('radial-organization','symmetry',0,eligible=False,explanation='An empty field provides no radial evidence.'))
     return out
 
@@ -322,8 +410,16 @@ def quick_reads(s,include_placement=True):
     output=[]
     for id,pos in [('rule-of-thirds',[1/3,2/3]),('golden-grid',[1-1/PHI,1/PHI]),('rule-of-fifths',[.2,.4,.6,.8]),('centre-cross',[.5])]:
         if include_placement:output.append(grid_read(s,id,pos))
-    for id,geom in templates(s.aspect).items():
-        if id not in ['rule-of-thirds','golden-grid','rule-of-fifths','centre-cross','quadrant']:output.append(template_read(s,id,geom))
+    T=templates(s.aspect)
+    for id,geom in T.items():
+        if id in ['rule-of-thirds','golden-grid','rule-of-fifths','centre-cross','quadrant','golden-triangle-ascending']:continue
+        if id=='golden-triangle':
+            # Both mirror forms; the null repeats the same choice, so the family control stays fair.
+            a,b=template_read(s,id,geom),template_read(s,id,T['golden-triangle-ascending'])
+            best=a if a['fit']>=b['fit'] else b
+            best['parameters'].update(variant='descending diagonal' if best is a else 'ascending diagonal',variants_tested=2,other_variant_fit=(b if best is a else a)['fit'])
+            output.append(best)
+        else:output.append(template_read(s,id,geom))
     output.extend([direction_read(s,'horizontal-organization',0),direction_read(s,'vertical-organization',np.pi/2),triangle_read(s)])
     return output
 

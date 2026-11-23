@@ -19,3 +19,4 @@
 .ringControls .swatch{display:inline-block;width:14px;height:3px;border-radius:2px}
 .ringControls .ringCount{gap:10px}
 .ringControls input[type=range]{flex:1}
+.nearMissLabel{margin:12px 0 2px;font-size:.6875rem;letter-spacing:.08em;color:var(--muted)}.readingLink.nearMiss{font-size:.875rem;color:var(--muted);padding:6px 0}.readingLink.nearMiss b{color:var(--ink);font-weight:600}.readingLink.nearMiss span{font-size:.8125rem}

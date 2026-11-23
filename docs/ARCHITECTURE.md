@@ -43,7 +43,7 @@ The application adapter uses a 0.06 relative mass mask. Watershed seeds come fro
 
 Placement now uses a separate, pinned U²-NetP foreground model running locally with ONNX Runtime on CPU. Inputs use the upstream 320×320 RGB normalization. The raw output is not stretched to manufacture confidence. Connected components at output >=0.5 must occupy 0.1–85% of the image; a weak or near-uniform map abstains. At most eight subjects are retained. Bounding-box centers locate the complete foreground components. Their placement weights are proportional to square-root area times mean foreground strength squared. Selection never sees a composition guide. Tonal regions remain unchanged for the other geometry methods. The model file SHA-256 and inference contract accompany each automatic reading.
 
-OpenCV LSD extracts tone and fixed-scale chroma segments after sigma-1.8/2.5 smoothing. Minimum length is 0.065 of the image diagonal. Near-duplicate pose/position pairs are removed, and at most 64 longest segments are retained. Canny luminance edges supply the curve-alignment view. Protected boundary mode halves mass near the outer 2% and ramps to full weight over the next 5%; it does not crop the image or suppress line evidence. Full ISR receives its own original edge-aware mode.
+OpenCV LSD extracts tone and fixed-scale chroma segments after sigma-1.8/2.5 smoothing. Minimum length is 0.065 of the image diagonal. Near-duplicate pose/position pairs are removed, and at most 64 longest segments are retained. Canny luminance edges supply the curve-alignment view. Protected boundary mode halves mass near the outer 2% and ramps to full weight over the next 5%, then sets aside tonal masses with more than 60% of their pixels inside that outer 7% band (a mat or frame otherwise survives as a ring whose centroid lies in the empty centre); bilateral symmetry ramps its gradients from zero at 2% to full at 7% in the same mode. It does not crop the image or suppress line evidence or foreground subjects. Full ISR receives its own original edge-aware mode.
 
 Manual anchors replace automatic anchor positions for anchor-based hypotheses. Their weights come from local Notan mass neighborhoods. They do not rewrite the mass field, edge field, or VTL/ISR outputs. Near-empty neighborhoods receive a small weight floor. Omitted automatic labels refer to that extraction; region identities can change under perturbation, so omission sensitivity should be interpreted cautiously.
 
@@ -55,14 +55,14 @@ Manual anchors replace automatic anchor positions for anchor-based hypotheses. T
 | Armature | Segment midpoint distance (sigma 0.025 diagonal) and orientation (sigma 0.14 radians), length-weighted | Alignment, not evidence an artist used that construction |
 | Direction | Length-weighted orientation affinity; sigma 0.15 radians | Long edges, not implied narrative motion |
 | Triangle | Best of top-12-anchor triples: mass coverage × triangular spread × area gate × weight-balance factor | Favors well-spread triples; scalene/narrow intentional triangles can score lower |
-| Bilateral | Opposite reflected normal gradients at two luminance-detail scales, with transverse-energy and boundary penalties; 36 coarse axes and 81 bounded refinements | Broad parallel tonal bands are insufficient; single-object symmetry and semantic pairing still differ |
+| Bilateral | Opposite reflected normal gradients at two luminance-detail scales, with transverse-energy and boundary penalties; 36 coarse axes plus bounded refinements; fit multiplied by a frame-coverage gate (0 at <=50% of the frame having a mirror partner, 1 at >=90%) | Broad parallel tonal bands are insufficient; an off-centre symmetric object is reported as subject symmetry (diagnostic), not frame symmetry; semantic pairing still differs |
 | Texture symmetry | Unchanged `imgsym.score_along_axis(..., method='hog')` along the chosen structural axis | Separate supplementary HOG result, never averaged into the structural score |
 | Circle | Least-squares circle on selected Notan contours, residual relative to radius and angular coverage | Circular boundary, not a whole-image narrative |
 | Spiral | Eight fixed true logarithmic spirals, growth 2 log(phi)/pi, arclength-weighted edge proximity | Restricted frame templates; alignment does not establish golden-ratio intent |
 | Convergence | Pair-derived intersections among top 32 segments; support from at least 3 with direction diversity | Convergence alone cannot distinguish perspective from radial rays |
-| Counterweight | Change in anchor-system centroid imbalance when one anchor's contribution is omitted | Algebraic omission, not image editing or perceptual causation |
+| Counterweight | Lead mass = greatest moment (tonal-mass share x offset from frame centre); fit = share of that moment cancelled by one opposing mass x lead-offset gate (full at 0.15 diagonal) x asymmetry (1 minus weight ratio x distance ratio of lead and counter) | Even spread is not one counterweight; equal twins at equal distances are symmetry; weight is tonal mass, not colour, isolation or subject interest |
 | Negative space | Fraction of Notan mass field below 0.06 | Flat field, not necessarily background or intentional empty space |
-| Radial | Mass-gradient squared-cosine agreement with rays from mass centroid | Round isolated bodies also produce this pattern |
+| Radial | Mass-gradient squared-cosine agreement with rays from mass centroid; fit = departure from isotropic 0.5 in either direction (concentric or radiating) x reach gate (gradient-weighted mean radius / 0.15 diagonal) x surround gate (share of 12 direction sectors holding structure / 0.75) | A large round body reads concentric; convergent perspective lines read radiating |
 | Quadrant | Four mass fractions | Diagnostic distribution, not a composition class |
 
 Frame ratios compare long-side/short-side ratio to sqrt(2), sqrt(3), 2, sqrt(5), phi and 3:2, with a 1.5% relative-error match window. Internal dynamic-symmetry constructions are not inferred from a matching frame.
@@ -102,3 +102,13 @@ The v0.2 symmetry measurement searches 36 coarse axes and 81 bounded local refin
 ## Lite build
 
 This build has no face, horizon, object-detection or subject-selection layer. Placement readings use the foreground map from the single U²-NetP model, weighted by area and strength. ISR is not included.
+
+## Fixes of 22 Nov 2026
+
+- Bilateral symmetry is gated by frame coverage; the best axis with no coverage requirement is reported as subject symmetry (diagnostic).
+- Radial organization counts radiating as well as concentric structure, with reach and surround requirements.
+- Counterweight is the lever reading above; it no longer saturates when removing any one large mass shifts the balance.
+- The diagonal-and-perpendiculars template (golden triangle) is tested in both mirror forms; the better one is reported.
+- A foreground component is set aside as sky when it touches the top edge and a side (or spans half the width), does not reach the bottom, has its centre in the upper 40% and is brighter than the picture median; it is recorded in the subject selection and a warning.
+- When no reading passes, the report lists up to three near misses (eligible, fit >= 0.45, ambiguous or sensitive) with the rule that held each back. The readable export includes the summary and near misses.
+- Spiral readings carried by texture say so when shifted copies of the edge field fit as well in more than half of trials.
